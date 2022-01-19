@@ -1,4 +1,4 @@
-%% Exercise 5.2
+%% Basic Spin Echo
 clear all; clc; close all; % clean up
 
 tmp = matlab.desktop.editor.getActive;  % get location of this script
@@ -49,7 +49,7 @@ for i=1:nTimeSteps
 end
 
 
-%% Question A
+%% Generate Spin echo MRI sequence
 
 TE = 6*1.0e-3; %3ms
 data_points = 48;
@@ -85,15 +85,17 @@ gradAmp(1,timestepsREADOUTEvent) = G_r; %X gradients in Tesla per meter
 
 
 % Generate the phase encoding gradient
+timestepsPHASEPrephaseEvent = 526:575;
+gradAmp(2,timestepsPHASEPrephaseEvent) = -(G_r/50)*24;  %Y gradients in Tesla per meter
+
 
 %Slice refocusing gradient and read prephase
 timestepsREADOUTPrephaseEvent = 526:575;
 
 gradAmp(1,timestepsREADOUTPrephaseEvent) =  -(G_r/50)*24; %X gradients in Tesla per meter
-gradAmp(2,timestepsREADOUTPrephaseEvent) = -(G_r/50)*24;  %Y gradients in Tesla per meter
+
 gradAmp(3,round(1:(pulsedurE/(dt)))) =  G_s; %Z gradients in Tesla per meter
 gradAmp(3,round((pulsedurE/(dt))+1):(150)) =  -G_s; %Z gradients in Tesla per meter
-
 gradAmp(3,round((startR*10^5))+(rfStepsR)-1) =  G_s; %Z gradients in Tesla per meter
 gradAmp(3,250:299) =  -G_s; %Z gradients in Tesla per meter
 gradAmp(3,400:449) =  -G_s; %Z gradients in Tesla per meter
@@ -113,62 +115,51 @@ xlabel('time (s)'), ylabel('G_{z}(T/m)');grid on;
 subplot(5,1,5); plot(time,adc,'k-','LineWidth',2);title('ADC_{y} Event');ylim([-20 60])
 xlabel('time (s)'), ylabel('ADC Event Count');grid on;
 
-%% Question B:
-
+%% Perform seuquence
 kSpace  = zeros(size(T1,1),size(T1,2));
+durPE = 0.5e-3;
+gradPEmax = pi * (ySteps-1)/(gamma*FOV_r) * 1/durPE;
 
 tic
 for trIndex=1:size(T1,2)
+    disp(trIndex);  
+    
+    %update the phase endcoding gradient
+    gradAmp(2,timestepsREADOUTPrephaseEvent) =  (1-(trIndex-1)/((ySteps-1)/2)) * gradPEmax; %Y gradients in Tesla per meter
+    k=1:xSteps;  
+    j=1:ySteps;
 
-    disp(trIndex);    
-
-    %Update phase encoding gradients
-    gradAmp(2,timestepsREADOUTPrephaseEvent) =  (-(G_r/50)*24)+(((G_r/50)*24)/48)*(trIndex-1); %Y gradients in Tesla per meter
-
-
-    k=1:xSteps;
-    for j=1:ySteps
-        for i=1:zSteps
-            r = pos(:,k,j,i);
-            mT = zeros(xSteps,1);
-            mZ = ones(xSteps,1);
-
-            %dB0 = ...
-            dB0 = gradAmp(:,1)'*r; 
-
-%             dB0 = dot(gradAmp(:,1)',r); 
-            [mT,mZ] =  bloch(dt, dB0,rfPulse(1), T1(k,j),T2(k,j), mT, mZ);
-
-            for t=2:nTimeSteps %i starts at 2
-
-%                 dB0 = dot(gradAmp(:,t),r(:,j)); 
-                dB0 = gradAmp(:,t)'*r; 
-                [mT,mZ] =  bloch(dt, dB0,rfPulse(t), T1(k,j),T2(k,j), mT, mZ);  
+        for i=1:zSteps            
+            r = reshape(pos(:,k,j,i),[3,xSteps*ySteps]);
+            mT = zeros(xSteps*ySteps,1);
+            mZ = ones(xSteps*ySteps,1);
+            
+            dB0 = (gradAmp(:,1)'*r)'; 
+            [mT,mZ] =  bloch(dt, dB0,rfPulse(1), reshape(T1(k,j),[xSteps*ySteps,1]),...
+                                                 reshape(T2(k,j),[xSteps*ySteps,1]), mT, mZ);  
                 
+            for t=2:nTimeSteps 
+                dB0 = (gradAmp(:,t)'*r)';
+                [mT,mZ] =  bloch(dt, dB0,rfPulse(t), reshape(T1(k,j),[xSteps*ySteps,1]),...
+                                                     reshape(T2(k,j),[xSteps*ySteps,1]), mT, mZ);
                 
-                if(adc(t)>0)
-                    kSpace(round(adc(t)),trIndex) = kSpace(round(adc(t)),trIndex) + (sum(mT)*PD(k,j));
-%                     fprintf('index %d,%d\n',round(adc(t)),trIndex);
+                if(adc(1,t)>0)
+                    PDt = PD(k,j);
+                    kSpace(round(adc(t)),trIndex) = kSpace(round(adc(t)),trIndex)+sum(mT.*reshape(PDt(k,j),[xSteps*ySteps,1]));
                 end
+                
+            end  %end of time loop                     
+        end %end z steps
+end %end of TR loop
+t = toc;
 
-            end            
-
-
-        end
-    end
-
-end
-toc
-
-%% Question C: Reconstruct the image
+%% Reconstructing the image
 
 figure;
-Ispace = fftshift((ifft2(kSpace)));
+Ispace = fftshift(ifft2(fftshift(kSpace)));
 subplot(2,1,1);imagesc(abs(Ispace));
 title('Magnitude Image');
-
-
 subplot(2,1,2);imagesc(log(abs((kSpace))),'CDataMapping','scaled'); 
 title('Absolute kSpace');
-saveas(gcf,'5p2')
+save('SpinEchoImage.mat','Ispace')
 
