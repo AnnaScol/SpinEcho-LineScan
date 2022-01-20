@@ -1,4 +1,4 @@
-function result = adipose_sinc_rf(window,TBWF,FA,dt)
+function result = apodize_sinc_rf(window,TBWF,FA,dt)
 %flip angle in radians
     gamma = 2*pi*42.577*10^6;
     w = hann(window); 

@@ -148,8 +148,8 @@ for trIndex=1:yStepsImg
     disp(trIndex);  
     
     %update the phase endcoding gradient
-    gradAmp(2,timestepsREADOUTPrephaseEvent) =  -(1-(trIndex-1)/((yStepsSim-1)/2)) * gradPEmax; %Y gradients in Tesla per meter
-    gradAmp(2,(576+(xStepsImg)):((576+(xStepsImg))+50)) =   (1-(trIndex-1)/((yStepsSim-1)/2)) * gradPEmax;
+    gradAmp(2,timestepsREADOUTPrephaseEvent) =  (1-(trIndex-1)/((yStepsSim-1)/2)) * gradPEmax; %Y gradients in Tesla per meter
+    gradAmp(2,(576+(xStepsImg)):((576+(xStepsImg))+50)) =   -(1-(trIndex-1)/((yStepsSim-1)/2)) * gradPEmax;
     
     k=1:xStepsSim*SCALE_FACTOR_x;  
     j=1:yStepsSim*SCALE_FACTOR_y;
