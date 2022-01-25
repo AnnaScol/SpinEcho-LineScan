@@ -1,8 +1,11 @@
 %% Spin Echo Line Scan
+% collects just the desired read line to speed up functionality
+
 clear all; clc; close all; % clean up
 
 tmp = matlab.desktop.editor.getActive;  % get location of this script
 cd(fileparts(tmp.Filename));            % set working directory to same
+
 
 
 dt    = 10^-5; 
@@ -35,7 +38,32 @@ xStepsImg = 48;
 yStepsImg = 48;
 zStepsImg = 1;
 
+LINE_SELECTED = 28;
 
+%check what line based on centerline
+if (mod(xStepsImg,2) == 0) %even
+    center_line = (xStepsImg/2)+1;
+    
+else %odd
+    center_line = ((xStepsImg-1)/2)+1;
+end
+
+actual_line = LINE_SELECTED - center_line; %need to figure out if it will mov up or down if neg or positive
+
+%Find paramters for gradients 
+TE = 6*1.0e-3; %3ms for TE/2
+data_points = xStepsImg;
+FOV_r=192*(10^-3);
+delta_r = FOV_r/data_points ;
+dwellt = 10*1.0e-6;
+t_acq = dwellt*data_points;
+G_r = ((2*pi)/gamma) * (1/(t_acq*delta_r)); %(2*pi)/gamma)*(1/(delta_r*t_acq))
+BW_p = (6/0.001); %2n/tau, manually just made 3 for example
+G_s = BW_p*(2*pi/(gamma*0.005));%slice thickness is 5mm 
+
+%Find the line that was selected and edit phase ramp/shift
+SELECTED_LINE = exp(1j*BW_p*actual_line*(1:100));
+%%
 % 3D positions in space
 pos = zeros(3,xStepsSim*SCALE_FACTOR_x,yStepsSim*SCALE_FACTOR_y,zStepsSim);
 for k=1:xStepsSim*SCALE_FACTOR_x
@@ -49,26 +77,13 @@ for k=1:xStepsSim*SCALE_FACTOR_x
 end
 
 
-
 %Generates the time line for sequence plotting
 for i=1:nTimeSteps 
     time(i)    = i*dt;                       %Time in seconds
 end
 
 
-% Generate and Display MRI Sequence
-TE = 6*1.0e-3; %3ms for TE/2
-data_points = xStepsImg;
-FOV_r=192*(10^-3);
-delta_r = FOV_r/data_points ;
-dwellt = 10*1.0e-6;
-t_acq = dwellt*data_points;
-G_r = ((2*pi)/gamma) * (1/(t_acq*delta_r)); %(2*pi)/gamma)*(1/(delta_r*t_acq))
-BW_p = (6/0.001); %2n/tau, manually just made 3 for example
-G_s = BW_p*(2*pi/(gamma*0.005));%slice thickness is 5mm 
-
 % %% RF %% %
-
 % RF Excitation Waveform
 pulsedurE = 0.001; % duration of the RF in s
 rfStepsE = round(1:(pulsedurE/(dt)));
@@ -81,11 +96,11 @@ startR = (TE/2);
 
 rfPulseR = apodize_sinc_rf(length(rfStepsR),3,pi,dt); %B1+ in Tesla
 %line scan selection
-rfPulseR = rfPulseR.*exp(-1j*12000*(1:100));
+rfPulseR = rfPulseR.*SELECTED_LINE;
 rfPulse(round((startR*10^5))+(rfStepsR)-1) = rfPulseR;
 
-% %% Gradients  %% %
 
+% %% Gradients  %% %
 % Generate the phase encoding gradient
 timestepsPHASEPrephaseEvent = round(((TE/dt)-(74*10^-5)/dt):((TE/dt)-(25*10^-5)/dt));
 gradAmp(2,timestepsPHASEPrephaseEvent) = G_r * (48/50) /2;  %Y gradients in Tesla per meter
@@ -101,64 +116,18 @@ gradAmp(1,timestepsREADOUTEvent) = G_r; %X read out event
 adc(2,timestepsADCEvent) = ones(1,xStepsImg);
 
 %%% ADDDING SPOILING GRADIENTS
-% n=3;
-% G_spoil = (n*((2*pi)/(gamma*0.005)))/(dt*50);
-% gradAmp(1,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  G_spoil;
-% 
-gradAmp(1,(576+(xStepsImg)):((576+(xStepsImg))+49)) =  -G_r * (48/50) / 2;
-% gradAmp(2,(576+(xStepsImg)):((576+(xStepsImg))+49)) =  -G_r * (48/50) / 2;
-% %%%
-
+n=3;
+G_spoil = (n*((2*pi)/(gamma*0.005)))/(dt*50);
 % %% Spatial Encoding
 
 gradAmp(3,round(1:(pulsedurE/(dt)))) =  G_s; %Z gradients in Tesla per meter
 gradAmp(3,round((pulsedurE/(dt))+1):((pulsedurR/(dt))+((pulsedurR/(dt))/2))) =  -G_s; %Z gradients in Tesla per meter
 
 gradAmp(1,round((startR*10^5))+(rfStepsR)) =  G_s; %Z gradients in Tesla per meter orig
-gradAmp(1,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  3.2*G_s; %Z gradients in Tesla per meter
-gradAmp(1,round((startR*10^5))+(pulsedurR/(dt)+(1:((pulsedurR/(dt))/2)))) =  3.2*G_s; %Z gradients in Tesla per meter
+gradAmp(1,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  3*G_s; %Z gradients in Tesla per meter
+gradAmp(1,round((startR*10^5))+(pulsedurR/(dt)+(1:((pulsedurR/(dt))/2)))) =  3*G_s; %Z gradients in Tesla per meter
 
-
-
-%% Create entire TR Sequence
-% TOTAL_REPETITIONS = 48;
-% gradPEmax = pi * (yStepsSim-1)/(gamma*FOV_r) * 1/0.5e-3;
-% for i = 1:47
-%     nStart =(700*i)+1;
-%     nEnd   =(700*i)+700;
-%     
-%     rfPulse(1,nStart:nEnd) = rfPulse(1,1:700);
-% 
-%     gradAmp(1,nStart:nEnd) = gradAmp(1,1:700);
-%     gradAmp(2,nStart-1+timestepsPHASEPrephaseEvent) = (1-(i+1-1)/((yStepsSim-1)/2)) * gradPEmax; %Y gradients in Tesla per meter
-%     gradAmp(2,nStart-1+((576+(xStepsImg)):((576+(xStepsImg))+49))) = -1* (1-(i+1-1)/((yStepsSim-1)/2)) * gradPEmax; %Y gradients in Tesla per meter
-% 
-%     gradAmp(3,nStart:nEnd) = gradAmp(3,1:700); 
-%     
-%     adc(1,nStart:nEnd)     = adc(1,1:700);
-%     adc(2,nStart:nEnd)     = adc(2,1:700)*(i+1);
-% 
-% end
-% 
-% %plot the compleate sequence
-% figure
-% subplot(6,1,1); plot(time(1:700),rfPulse(1:700),'k-','LineWidth',2);title('TR Cycle: RF Pulse'); 
-% xlabel('time (s)'), ylabel('|B_{1}^{+}| (T)');grid on;
-% subplot(6,1,2); plot(time(1:700),gradAmp(1,(1:700)),'r-','LineWidth',2);title('TR Cycle: Read Gradient'); ylim([-0.06 0.05]);
-% xlabel('time (s)'), ylabel('G_{r}(T/m)');grid on;
-% subplot(6,1,3); plot(time(1:700),gradAmp(2,(1:700)),'g-','LineWidth',2);title('TR Cycle: Phase Gradient');ylim([-0.06 0.05]);
-% xlabel('time (s)'), ylabel('G_{p}(T/m)');grid on;
-% subplot(6,1,4); plot(time(1:700),gradAmp(3,(1:700)),'b-','LineWidth',2);title('TR Cycle: Slice Select Gradient');ylim([-0.06 0.05])
-% xlabel('time (s)'), ylabel('G_{z}(T/m)');grid on;
-% 
-% subplot(6,1,5); plot(time(1:700),adc(1,(1:700)),'k-','LineWidth',2);title('ADC_{x} Event');ylim([-20 60])
-% xlabel('time (s)'), ylabel('ADC Event Count');grid on;
-% subplot(6,1,6); plot(time(1:700),adc(2,(1:700)),'k-','LineWidth',2);title('ADC_{x} Event');ylim([-20 60])
-% xlabel('time (s)'), ylabel('ADC Event Count');grid on;
-
-
-
-
+%% PLOTTING
 figure
 subplot(6,1,1); plot(time,rfPulse,'k-','LineWidth',2);title('Full Sequence: RF Pulse'); 
 xlabel('time (s)'), ylabel('|B_{1}^{+}| (T)');grid on;

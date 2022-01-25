@@ -1,8 +1,11 @@
 %% Spin Echo Line Scan
+% collects just the desired read line to speed up functionality
+
 clear all; clc; close all; % clean up
 
 tmp = matlab.desktop.editor.getActive;  % get location of this script
 cd(fileparts(tmp.Filename));            % set working directory to same
+
 
 
 dt    = 10^-5; 
@@ -35,7 +38,32 @@ xStepsImg = 48;
 yStepsImg = 48;
 zStepsImg = 1;
 
+LINE_SELECTED = 25;
 
+%check what line based on centerline
+if (mod(xStepsImg,2) == 0) %even
+    center_line = (xStepsImg/2)+1;
+    
+else %odd
+    center_line = ((xStepsImg-1)/2)+1;
+end
+
+actual_line = LINE_SELECTED - center_line; %need to figure out if it will mov up or down if neg or positive
+
+%Find paramters for gradients 
+TE = 6*1.0e-3; %3ms for TE/2
+data_points = xStepsImg;
+FOV_r=192*(10^-3);
+delta_r = FOV_r/data_points ;
+dwellt = 10*1.0e-6;
+t_acq = dwellt*data_points;
+G_r = ((2*pi)/gamma) * (1/(t_acq*delta_r)); %(2*pi)/gamma)*(1/(delta_r*t_acq))
+BW_p = (6/0.001); %2n/tau, manually just made 3 for example
+G_s = BW_p*(2*pi/(gamma*0.005));%slice thickness is 5mm 
+
+%Find the line that was selected and edit phase ramp/shift
+SELECTED_LINE = exp(1j*BW_p*actual_line*(1:100));
+%%
 % 3D positions in space
 pos = zeros(3,xStepsSim*SCALE_FACTOR_x,yStepsSim*SCALE_FACTOR_y,zStepsSim);
 for k=1:xStepsSim*SCALE_FACTOR_x
@@ -57,15 +85,15 @@ end
 
 
 % Generate and Display MRI Sequence
-TE = 6*1.0e-3; %3ms for TE/2
-data_points = xStepsImg;
-FOV_r=192*(10^-3);
-delta_r = FOV_r/data_points ;
-dwellt = 10*1.0e-6;
-t_acq = dwellt*data_points;
-G_r = ((2*pi)/gamma) * (1/(t_acq*delta_r)); %(2*pi)/gamma)*(1/(delta_r*t_acq))
-BW_p = (6/0.001); %2n/tau, manually just made 3 for example
-G_s = BW_p*(2*pi/(gamma*0.005));%slice thickness is 5mm 
+% TE = 6*1.0e-3; %3ms for TE/2
+% data_points = xStepsImg;
+% FOV_r=192*(10^-3);
+% delta_r = FOV_r/data_points ;
+% dwellt = 10*1.0e-6;
+% t_acq = dwellt*data_points;
+% G_r = ((2*pi)/gamma) * (1/(t_acq*delta_r)); %(2*pi)/gamma)*(1/(delta_r*t_acq))
+% BW_p = (6/0.001); %2n/tau, manually just made 3 for example
+% G_s = BW_p*(2*pi/(gamma*0.005));%slice thickness is 5mm 
 
 % %% RF %% %
 
@@ -81,7 +109,7 @@ startR = (TE/2);
 
 rfPulseR = apodize_sinc_rf(length(rfStepsR),3,pi,dt); %B1+ in Tesla
 %line scan selection
-rfPulseR = rfPulseR.*exp(-1j*12000*(1:100));
+rfPulseR = rfPulseR.*exp(1j*12000*(1:100));
 rfPulse(round((startR*10^5))+(rfStepsR)-1) = rfPulseR;
 
 % %% Gradients  %% %
@@ -102,21 +130,15 @@ adc(2,timestepsADCEvent) = ones(1,xStepsImg);
 
 %%% ADDDING SPOILING GRADIENTS
 % n=3;
-% G_spoil = (n*((2*pi)/(gamma*0.005)))/(dt*50);
-% gradAmp(1,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  G_spoil;
-% 
-gradAmp(1,(576+(xStepsImg)):((576+(xStepsImg))+49)) =  -G_r * (48/50) / 2;
-% gradAmp(2,(576+(xStepsImg)):((576+(xStepsImg))+49)) =  -G_r * (48/50) / 2;
-% %%%
-
+G_spoil = (n*((2*pi)/(gamma*0.005)))/(dt*50);
 % %% Spatial Encoding
 
 gradAmp(3,round(1:(pulsedurE/(dt)))) =  G_s; %Z gradients in Tesla per meter
 gradAmp(3,round((pulsedurE/(dt))+1):((pulsedurR/(dt))+((pulsedurR/(dt))/2))) =  -G_s; %Z gradients in Tesla per meter
 
 gradAmp(1,round((startR*10^5))+(rfStepsR)) =  G_s; %Z gradients in Tesla per meter orig
-gradAmp(1,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  3.2*G_s; %Z gradients in Tesla per meter
-gradAmp(1,round((startR*10^5))+(pulsedurR/(dt)+(1:((pulsedurR/(dt))/2)))) =  3.2*G_s; %Z gradients in Tesla per meter
+gradAmp(1,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  3*G_s; %Z gradients in Tesla per meter
+gradAmp(1,round((startR*10^5))+(pulsedurR/(dt)+(1:((pulsedurR/(dt))/2)))) =  3*G_s; %Z gradients in Tesla per meter
 
 
 
