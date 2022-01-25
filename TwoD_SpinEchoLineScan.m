@@ -81,7 +81,7 @@ startR = (TE/2);
 
 rfPulseR = apodize_sinc_rf(length(rfStepsR),3,pi,dt); %B1+ in Tesla
 %line scan selection
-rfPulseR = rfPulseR.*exp(-1j*12000*(1:100));
+rfPulseR = rfPulseR.*exp(-1j*0*(1:100));
 rfPulse(round((startR*10^5))+(rfStepsR)-1) = rfPulseR;
 
 % %% Gradients  %% %

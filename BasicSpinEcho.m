@@ -66,14 +66,14 @@ G_s = BW_p*(2*pi/(gamma*0.005));%slice thickness is 5mm
 %Generate the RF excitation waveform
 pulsedurE = 0.001; % duration of the RF in s
 rfStepsE = round(1:(pulsedurE/(dt)));
-rfPulse(rfStepsE) = adipose_sinc_rf(length(rfStepsE),3,pi/2,dt); %B1+ in Tesla
+rfPulse(rfStepsE) = apodize_sinc_rf(length(rfStepsE),3,pi/2,dt); %B1+ in Tesla
 
 %Generate the refocusing pule(s)
 pulsedurR = 0.001; % duration of the RF in s
 rfStepsR = round(1:(pulsedurR/(dt)));
 startR = (TE/2);
 
-rfPulseR = adipose_sinc_rf(length(rfStepsR),3,pi,dt); %B1+ in Tesla
+rfPulseR = apodize_sinc_rf(length(rfStepsR),3,pi,dt); %B1+ in Tesla
 rfPulse(round((startR*10^5))+(rfStepsR)-1) = rfPulseR;
 
 %Generate the readout + ADC
