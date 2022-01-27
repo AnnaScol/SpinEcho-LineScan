@@ -1,0 +1,32 @@
+clear all
+clc
+%%
+LI_1D = load('LineImage1D.mat');
+LI = load('LineImage.mat');
+% SE = load('SpinEchoImage.mat');
+
+
+figure;
+
+line2D = LI.Ispace(25,:)';
+
+
+subplot(2,2,1);plot(abs(line2D),'CDataMapping','scaled');
+
+subplot(2,2,2);plot(abs(LI_1D.Ispace));
+title('Line Image');
+
+
+subplot(2,2,4);plot(abs(line2D)-abs(LI_1D.Ispace));
+title('Test');
+
+%% kSpace comparison
+k1D = fftshift(fft(fftshift(LI_1D.Ispace)));
+kLine = fftshift(fft(fftshift(abs(line2D))));
+
+figure;
+subplot(2,1,1);imagesc(log(abs(k1D)));
+title('1D Line Image');
+
+subplot(2,1,2);imagesc(log(abs(kLine)));
+title('From 2D Line Image');

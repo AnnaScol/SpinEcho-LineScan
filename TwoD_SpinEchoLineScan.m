@@ -13,8 +13,8 @@ load('PD.mat');
 load('T1.mat');
 load('T2.mat');
 
-SCALE_FACTOR_x = 8;
-SCALE_FACTOR_y = 1;
+SCALE_FACTOR_x = 1;
+SCALE_FACTOR_y = 8;
 
 %Allocate the memory needed
 nTimeSteps  = 700;%*48;
@@ -81,7 +81,7 @@ startR = (TE/2);
 
 rfPulseR = apodize_sinc_rf(length(rfStepsR),3,pi,dt); %B1+ in Tesla
 %line scan selection
-rfPulseR = rfPulseR.*exp(-1j*0*(1:100));
+rfPulseR = rfPulseR.*exp(1j*0*(1:100)); %3000 is one slice so moved 2 slices
 rfPulse(round((startR*10^5))+(rfStepsR)-1) = rfPulseR;
 
 % %% Gradients  %% %
@@ -105,7 +105,7 @@ adc(2,timestepsADCEvent) = ones(1,xStepsImg);
 % G_spoil = (n*((2*pi)/(gamma*0.005)))/(dt*50);
 % gradAmp(1,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  G_spoil;
 % 
-gradAmp(1,(576+(xStepsImg)):((576+(xStepsImg))+49)) =  -G_r * (48/50) / 2;
+% gradAmp(1,(576+(xStepsImg)):((576+(xStepsImg))+49)) =  -G_r * (48/50) / 2;
 % gradAmp(2,(576+(xStepsImg)):((576+(xStepsImg))+49)) =  -G_r * (48/50) / 2;
 % %%%
 
@@ -114,9 +114,9 @@ gradAmp(1,(576+(xStepsImg)):((576+(xStepsImg))+49)) =  -G_r * (48/50) / 2;
 gradAmp(3,round(1:(pulsedurE/(dt)))) =  G_s; %Z gradients in Tesla per meter
 gradAmp(3,round((pulsedurE/(dt))+1):((pulsedurR/(dt))+((pulsedurR/(dt))/2))) =  -G_s; %Z gradients in Tesla per meter
 
-gradAmp(1,round((startR*10^5))+(rfStepsR)) =  G_s; %Z gradients in Tesla per meter orig
-gradAmp(1,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  3.2*G_s; %Z gradients in Tesla per meter
-gradAmp(1,round((startR*10^5))+(pulsedurR/(dt)+(1:((pulsedurR/(dt))/2)))) =  3.2*G_s; %Z gradients in Tesla per meter
+gradAmp(2,round((startR*10^5))+(rfStepsR)) =  G_s; %Z gradients in Tesla per meter orig
+gradAmp(2,round((startR*10^5)-((pulsedurR/(dt))/2)+(1:((pulsedurR/(dt))/2)))) =  3.2*G_s; %Z gradients in Tesla per meter
+gradAmp(2,round((startR*10^5))+(pulsedurR/(dt)+(1:((pulsedurR/(dt))/2)))) =  3.2*G_s; %Z gradients in Tesla per meter
 
 
 
@@ -209,14 +209,14 @@ counter = 1;
         mZ = ones(x_Steps*y_Steps,1);
 
         % Find inital magnetization
-        dB0 = ((gradAmp(:,1)'*r)')+2.5e-7*(rand(x_Steps*y_Steps,1)-1);%+2.5e-7*(rand(1,nSpins)*2-1); 
+        dB0 = ((gradAmp(:,1)'*r)');
         [mT,mZ] =  bloch(dt, dB0,rfPulse(1), reshape(T1_new(k,j),[x_Steps*y_Steps,1]),...
                                              reshape(T2_new(k,j),[x_Steps*y_Steps,1]),...
                                              mT, mZ);  
 
         % Find magnetization for rest of sequence                              
         for t=2:nTimeSteps 
-            dB0 = ((gradAmp(:,t)'*r)')+2.5e-7*(rand(x_Steps*y_Steps,1)-1);
+            dB0 = ((gradAmp(:,t)'*r)');
             [mT,mZ] =  bloch(dt, dB0,rfPulse(t), reshape(T1_new(k,j),[x_Steps*y_Steps,1]),...
                                                  reshape(T2_new(k,j),[x_Steps*y_Steps,1]), ...
                                                  mT, mZ);
